@@ -1,0 +1,96 @@
+from rest_framework import generics, status, viewsets # type: ignore from rest_framework
+from rest_framework.decorators import action # type: ignore from rest_framework.decorators
+from rest_framework.response import Response # type: ignore from rest_framework.response
+from rest_framework.permissions import IsAuthenticated, AllowAny # type: ignore from rest_framework.permissions
+from rest_framework_simplejwt.views import TokenObtainPairView # type: ignore from rest_framework_simplejwt.views
+from rest_framework_simplejwt.tokens import RefreshToken # type: ignore from rest_framework_simplejwt.tokens
+from django.contrib.auth import get_user_model # type: ignore from django.contrib.auth
+from drf_spectacular.utils import extend_schema, extend_schema_view # type: ignore from drf_spectacular.utils
+
+from .serializers import (
+    CustomTokenObtainPairSerializer, UserSerializer,
+    UserCreateSerializer, ChangePasswordSerializer, UserProfileSerializer,
+)
+from .permissions import IsAdminNational, IsSuperAdmin
+
+User = get_user_model()
+
+
+@extend_schema(tags=['auth'])
+class LoginView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+
+    @extend_schema(summary='Connexion utilisateur', description='Authentification par email et mot de passe. Retourne les tokens JWT.')
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
+
+@extend_schema(tags=['auth'])
+class LogoutView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(summary='Déconnexion', description='Invalide le refresh token.')
+    def post(self, request):
+        try:
+            refresh_token = request.data.get('refresh')
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response({'detail': 'Déconnexion réussie.'}, status=status.HTTP_200_OK)
+        except Exception:
+            return Response({'detail': 'Token invalide.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@extend_schema(tags=['auth'])
+class ProfileView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserProfileSerializer
+
+    def get_object(self):
+        return self.request.user
+
+
+@extend_schema(tags=['auth'])
+class ChangePasswordView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ChangePasswordSerializer
+
+    @extend_schema(summary='Changer le mot de passe')
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        if not user.check_password(serializer.validated_data['old_password']):
+            return Response({'old_password': 'Mot de passe actuel incorrect.'}, status=status.HTTP_400_BAD_REQUEST)
+        user.set_password(serializer.validated_data['new_password'])
+        user.save()
+        return Response({'detail': 'Mot de passe modifié avec succès.'})
+
+
+@extend_schema(tags=['auth'])
+@extend_schema_view(
+    list=extend_schema(summary='Liste des utilisateurs'),
+    create=extend_schema(summary='Créer un utilisateur'),
+    retrieve=extend_schema(summary='Détail utilisateur'),
+    update=extend_schema(summary='Modifier un utilisateur'),
+    destroy=extend_schema(summary='Supprimer un utilisateur'),
+)
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all().order_by('last_name', 'first_name')
+    permission_classes = [IsAdminNational]
+    filterset_fields = ['role', 'is_active', 'entity_type']
+    search_fields = ['email', 'first_name', 'last_name']
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return UserCreateSerializer
+        return UserSerializer
+
+    def get_permissions(self):
+        if self.action == 'create':
+            return [IsSuperAdmin()]
+        return super().get_permissions()
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def me(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
