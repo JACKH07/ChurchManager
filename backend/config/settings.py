@@ -13,7 +13,9 @@ FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
 
 # Sécurité HTTPS (activée uniquement en production)
 if not DEBUG:
-    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+    # Render/Vercel gèrent SSL au niveau du proxy — ne pas rediriger depuis Django
+    SECURE_SSL_REDIRECT = False
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
@@ -186,7 +188,7 @@ CELERY_TIMEZONE = TIME_ZONE
 
 try:
     import redis as redis_lib  # pyright: ignore[reportMissingImports]
-    r = redis_lib.from_url(REDIS_URL)
+    r = redis_lib.from_url(REDIS_URL, socket_connect_timeout=2, socket_timeout=2)
     r.ping()
     CACHES = {
         'default': {
@@ -194,6 +196,8 @@ try:
             'LOCATION': REDIS_URL,
             'OPTIONS': {
                 'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'SOCKET_CONNECT_TIMEOUT': 2,
+                'SOCKET_TIMEOUT': 2,
             }
         }
     }
