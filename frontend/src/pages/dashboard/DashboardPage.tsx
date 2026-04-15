@@ -57,7 +57,7 @@ export const DashboardPage = () => {
       <div className="card p-6 bg-gradient-to-br from-primary-700 to-purple-700 text-white border-0">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold">Bonjour, {user?.first_name} 👋</h2>
+            <h2 className="text-xl font-bold">Bonjour, {user?.first_name}</h2>
             <p className="text-blue-200 text-sm mt-1">
               {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
