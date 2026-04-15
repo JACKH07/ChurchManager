@@ -3,6 +3,9 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": "vite",
+  "env": {
+    "NODE_VERSION": "20"
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
