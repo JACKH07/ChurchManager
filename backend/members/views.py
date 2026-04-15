@@ -15,10 +15,11 @@ from drf_spectacular.utils import extend_schema  # pyright: ignore[reportMissing
 from .models import Fidele, Ministere, TransfertFidele
 from .serializers import FideleSerializer, FideleListSerializer, MinistereSerializer, TransfertFideleSerializer
 from accounts.permissions import IsAuthenticated, IsChefParoisse, IsPasteurLocal
+from accounts.mixins import ScopedQuerysetMixin
 
 
 @extend_schema(tags=['members'])
-class FideleViewSet(viewsets.ModelViewSet):
+class FideleViewSet(ScopedQuerysetMixin, viewsets.ModelViewSet):
     queryset = Fidele.objects.select_related('eglise__paroisse__district__region').prefetch_related('ministeres').all()
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['statut', 'genre', 'eglise', 'eglise__paroisse', 'eglise__paroisse__district',
@@ -26,6 +27,14 @@ class FideleViewSet(viewsets.ModelViewSet):
     search_fields = ['nom', 'prenom', 'code_fidele', 'telephone', 'email']
     ordering_fields = ['nom', 'prenom', 'date_inscription', 'created_at']
     permission_classes = [IsAuthenticated]
+
+    scope_region_filter = 'eglise__paroisse__district__region_id'
+    scope_district_filter = 'eglise__paroisse__district_id'
+    scope_paroisse_filter = 'eglise__paroisse_id'
+    scope_eglise_filter = 'eglise_id'
+
+    def get_queryset(self):
+        return self.get_scoped_queryset(super().get_queryset())
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -114,8 +123,9 @@ class FideleViewSet(viewsets.ModelViewSet):
         })
         serializer.is_valid(raise_exception=True)
         transfert = serializer.save(approuve_par=request.user)
+        # Le fidèle reste actif dans sa nouvelle église
         fidele.eglise = transfert.eglise_destination
-        fidele.statut = 'transfere'
+        fidele.statut = 'actif'
         fidele.save()
         return Response(TransfertFideleSerializer(transfert).data, status=status.HTTP_201_CREATED)
 

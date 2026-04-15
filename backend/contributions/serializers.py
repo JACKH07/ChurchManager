@@ -1,5 +1,6 @@
 from rest_framework import serializers # type: ignore from rest_framework
 from django.utils import timezone # type: ignore from django.utils
+from django.db.models import Sum
 from .models import Cotisation, Recu, ObjectifCotisation # type: ignore from local app  
 
 
@@ -56,7 +57,7 @@ class ObjectifCotisationSerializer(serializers.ModelSerializer):
             periode_mois=obj.periode_mois,
             periode_annee=obj.periode_annee,
             statut='valide',
-        ).aggregate(total=models.Sum('montant'))['total'] or 0 # type: ignore from django.db.models
+        ).aggregate(total=Sum('montant'))['total'] or 0
         if obj.montant_objectif > 0:
             return round(float(total) / float(obj.montant_objectif) * 100, 2)
         return 0

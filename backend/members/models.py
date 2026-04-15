@@ -1,5 +1,5 @@
-from django.db import models # type: ignore from django.db
-from django.utils import timezone # type: ignore from django.utils
+from django.db import models, transaction
+from django.utils import timezone
 from hierarchy.models import EgliseLocale
 
 
@@ -24,16 +24,25 @@ class Genre(models.TextChoices):
 
 
 def generate_code_fidele(eglise: EgliseLocale, annee: int = None) -> str:
-    """Génère le code unique d'identification du fidèle : REG-DIS-PAR-EGL-XXXX-AAAA"""
+    """Génère un code unique pour le fidèle : REG-DIS-PAR-EGL-XXXX-AAAA.
+    Utilise select_for_update pour éviter les doublons en cas de requêtes simultanées.
+    """
     if annee is None:
         annee = timezone.now().year
     p = eglise.paroisse
     d = p.district
     r = d.region
-    # Compter les fidèles existants dans cette église
-    count = Fidele.objects.filter(eglise=eglise).count() + 1
-    seq = str(count).zfill(4)
-    return f"{r.code}-{d.code}-{p.code}-{eglise.code}-{seq}-{annee}"
+
+    with transaction.atomic():
+        count = Fidele.objects.select_for_update().filter(eglise=eglise).count() + 1
+        seq = str(count).zfill(4)
+        code = f"{r.code}-{d.code}-{p.code}-{eglise.code}-{seq}-{annee}"
+        # En cas de collision rare, incrémenter jusqu'à trouver un code libre
+        while Fidele.objects.filter(code_fidele=code).exists():
+            count += 1
+            seq = str(count).zfill(4)
+            code = f"{r.code}-{d.code}-{p.code}-{eglise.code}-{seq}-{annee}"
+    return code
 
 
 class Ministere(models.Model):

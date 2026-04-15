@@ -8,6 +8,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 
 
 def api_root(request):
+    from django.conf import settings as django_settings
     return JsonResponse({
         'name': 'ChurchManager API',
         'version': '1.0.0',
@@ -18,7 +19,7 @@ def api_root(request):
             'admin': request.build_absolute_uri('/admin/'),
             'api_v1': request.build_absolute_uri('/api/v1/'),
         },
-        'frontend': 'http://localhost:5173',
+        'frontend': getattr(django_settings, 'FRONTEND_URL', 'http://localhost:5173'),
     })
 
 

@@ -5,8 +5,23 @@ from decouple import config # type: ignore
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-production')
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1').split(',')
+
+FRONTEND_URL = config('FRONTEND_URL', default='http://localhost:5173')
+
+# Sécurité HTTPS (activée uniquement en production)
+if not DEBUG:
+    SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=True, cast=bool)
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    CSRF_TRUSTED_ORIGINS = config(
+        'CSRF_TRUSTED_ORIGINS',
+        default=FRONTEND_URL
+    ).split(',')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -145,10 +160,11 @@ SIMPLE_JWT = {
 }
 
 # CORS
-CORS_ALLOWED_ORIGINS = [
-    config('FRONTEND_URL', default='http://localhost:5173'),
+CORS_ALLOWED_ORIGINS = list(filter(None, [
+    FRONTEND_URL,
     'http://localhost:3000',
-]
+    'http://localhost:5173',
+]))
 CORS_ALLOW_CREDENTIALS = True
 
 # Redis & Celery

@@ -12,10 +12,11 @@ from .serializers import (
     RecuSerializer, ObjectifCotisationSerializer,
 )
 from accounts.permissions import IsAuthenticated, IsPasteurLocal, IsChefParoisse
+from accounts.mixins import ScopedQuerysetMixin
 
 
 @extend_schema(tags=['contributions'])
-class CotisationViewSet(viewsets.ModelViewSet):
+class CotisationViewSet(ScopedQuerysetMixin, viewsets.ModelViewSet):
     queryset = Cotisation.objects.select_related('fidele', 'enregistre_par', 'valide_par').all()
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = [
@@ -26,6 +27,14 @@ class CotisationViewSet(viewsets.ModelViewSet):
     search_fields = ['reference', 'fidele__nom', 'fidele__prenom', 'fidele__code_fidele']
     ordering_fields = ['date_paiement', 'montant', 'created_at']
     permission_classes = [IsAuthenticated]
+
+    scope_region_filter = 'fidele__eglise__paroisse__district__region_id'
+    scope_district_filter = 'fidele__eglise__paroisse__district_id'
+    scope_paroisse_filter = 'fidele__eglise__paroisse_id'
+    scope_eglise_filter = 'fidele__eglise_id'
+
+    def get_queryset(self):
+        return self.get_scoped_queryset(super().get_queryset())
 
     def get_serializer_class(self):
         if self.action == 'list':

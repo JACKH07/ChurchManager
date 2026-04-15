@@ -28,15 +28,38 @@ class EvenementViewSet(viewsets.ModelViewSet):
     def inscrire(self, request, pk=None):
         evenement = self.get_object()
         fidele_id = request.data.get('fidele')
+
+        if not fidele_id:
+            return Response({'detail': 'Le champ fidele est requis.'}, status=400)
+
+        # Vérifier que le fidèle existe
+        from members.models import Fidele
+        try:
+            fidele = Fidele.objects.get(pk=fidele_id)
+        except Fidele.DoesNotExist:
+            return Response({'detail': 'Fidèle introuvable.'}, status=404)
+
+        # Un pasteur/chef ne peut inscrire que les fidèles de son église/paroisse
+        user = request.user
+        if not user.is_at_least('admin_national'):
+            if user.entity_id and fidele.eglise_id != user.entity_id:
+                if not user.is_at_least('chef_paroisse'):
+                    return Response(
+                        {'detail': 'Vous ne pouvez pas inscrire un fidèle hors de votre périmètre.'},
+                        status=403
+                    )
+
         if evenement.places_disponibles is not None and evenement.places_disponibles <= 0:
             return Response({'detail': 'Plus de places disponibles.'}, status=400)
+
+        statut_inscription = 'en_attente' if evenement.inscription_requise else 'confirme'
         inscription, created = InscriptionEvenement.objects.get_or_create(
             evenement=evenement,
-            fidele_id=fidele_id,
-            defaults={'statut': 'confirme'}
+            fidele=fidele,
+            defaults={'statut': statut_inscription}
         )
         if not created:
-            return Response({'detail': 'Déjà inscrit.'}, status=400)
+            return Response({'detail': 'Ce fidèle est déjà inscrit à cet événement.'}, status=400)
         return Response(InscriptionEvenementSerializer(inscription).data, status=201)
 
     @action(detail=True, methods=['get'])

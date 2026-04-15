@@ -12,6 +12,7 @@ from .serializers import (
     UserCreateSerializer, ChangePasswordSerializer, UserProfileSerializer,
 )
 from .permissions import IsAdminNational, IsSuperAdmin
+from .audit import log_action
 
 User = get_user_model()
 
@@ -33,11 +34,14 @@ class LogoutView(generics.GenericAPIView):
     def post(self, request):
         try:
             refresh_token = request.data.get('refresh')
+            if not refresh_token:
+                return Response({'detail': 'Le refresh token est requis.'}, status=status.HTTP_400_BAD_REQUEST)
             token = RefreshToken(refresh_token)
             token.blacklist()
+            log_action(request.user, 'logout', 'User', object_id=request.user.pk, request=request)
             return Response({'detail': 'Déconnexion réussie.'}, status=status.HTTP_200_OK)
         except Exception:
-            return Response({'detail': 'Token invalide.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'detail': 'Token invalide ou déjà révoqué.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @extend_schema(tags=['auth'])
@@ -89,6 +93,20 @@ class UserViewSet(viewsets.ModelViewSet):
         if self.action == 'create':
             return [IsSuperAdmin()]
         return super().get_permissions()
+
+    def perform_create(self, serializer):
+        user = serializer.save()
+        log_action(self.request.user, 'create_user', 'User',
+                   object_id=user.pk,
+                   details={'email': user.email, 'role': user.role},
+                   request=self.request)
+
+    def perform_destroy(self, instance):
+        log_action(self.request.user, 'delete_user', 'User',
+                   object_id=instance.pk,
+                   details={'email': instance.email},
+                   request=self.request)
+        instance.delete()
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def me(self, request):
