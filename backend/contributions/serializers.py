@@ -1,6 +1,6 @@
 from rest_framework import serializers # type: ignore from rest_framework
 from django.utils import timezone # type: ignore from django.utils
-from django.db.models import Sum
+from django.db.models import Sum # type: ignore from django.db.models
 from .models import Cotisation, Recu, ObjectifCotisation # type: ignore from local app  
 
 

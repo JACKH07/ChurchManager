@@ -1,8 +1,8 @@
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from drf_spectacular.utils import extend_schema
+from rest_framework import viewsets, status # type: ignore from rest_framework          
+from rest_framework.decorators import action # type: ignore from rest_framework.decorators
+from rest_framework.response import Response # type: ignore from rest_framework.response
+from rest_framework.permissions import IsAuthenticated # type: ignore from rest_framework.permissions
+from drf_spectacular.utils import extend_schema # type: ignore from drf_spectacular.utils
 
 from .models import Notification
 from .serializers import NotificationSerializer
