@@ -186,10 +186,7 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
-try:
-    import redis as redis_lib  # pyright: ignore[reportMissingImports]
-    r = redis_lib.from_url(REDIS_URL, socket_connect_timeout=2, socket_timeout=2)
-    r.ping()
+if config('REDIS_URL', default='') and not config('REDIS_URL', default='').startswith('redis://localhost'):
     CACHES = {
         'default': {
             'BACKEND': 'django_redis.cache.RedisCache',
@@ -201,7 +198,7 @@ try:
             }
         }
     }
-except Exception:
+else:
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
