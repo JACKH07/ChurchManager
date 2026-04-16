@@ -186,15 +186,22 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
-if config('REDIS_URL', default='') and not config('REDIS_URL', default='').startswith('redis://localhost'):
+# Connexion Redis lazy : aucune tentative de connexion au démarrage.
+# django-redis se connecte uniquement à la première opération de cache.
+# Si REDIS_URL pointe vers localhost (dev) ou est absent, on utilise le cache mémoire local.
+_redis_url = config('REDIS_URL', default='')
+_use_redis = bool(_redis_url) and 'localhost' not in _redis_url and '127.0.0.1' not in _redis_url
+
+if _use_redis:
     CACHES = {
         'default': {
             'BACKEND': 'django_redis.cache.RedisCache',
-            'LOCATION': REDIS_URL,
+            'LOCATION': _redis_url,
             'OPTIONS': {
                 'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-                'SOCKET_CONNECT_TIMEOUT': 2,
-                'SOCKET_TIMEOUT': 2,
+                'SOCKET_CONNECT_TIMEOUT': 3,
+                'SOCKET_TIMEOUT': 3,
+                'IGNORE_EXCEPTIONS': True,
             }
         }
     }
