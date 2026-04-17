@@ -1,13 +1,16 @@
-# Monorepo : le Blueprint officiel est render.yaml à la racine du dépôt (rootDir: backend).
-# Ce fichier sert de copie ; les commandes ci-dessous supposent la racine Git = racine du repo.
+# Blueprint Render : la racine du repo est le monorepo ; le code Django est dans backend/
+# Pour un service Web déjà créé à la main : Settings → Root Directory = backend
+#   Build Command : ./build.sh
+#   Start Command : gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level info
 
 services:
   - type: web
     name: churchmanager-backend
     env: python
     region: frankfurt
-    buildCommand: "cd backend && pip install -r requirements.txt && python manage.py collectstatic --noinput && if [ -n \"$DATABASE_URL\" ]; then python manage.py migrate; fi"
-    startCommand: "cd backend && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level info"
+    rootDir: backend
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level info"
     envVars:
       - key: DEBUG
         value: "False"

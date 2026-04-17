@@ -1,0 +1,14 @@
+Render — monorepo (requirements.txt dans backend/)
+
+Option A (recommandé)
+  Settings → Build & Deploy → Root Directory : backend
+  Build Command  : ./build.sh
+  Start Command  : gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level info
+
+Option B (Root Directory vide)
+  Build Command  : cd backend && pip install -r requirements.txt && python manage.py collectstatic --noinput && if [ -n "$DATABASE_URL" ]; then python manage.py migrate; fi
+  Start Command  : cd backend && gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120 --log-level info
+
+Ensuite : Manual Deploy → Clear build cache & deploy.
+
+Blueprint : utiliser render.yaml à la racine du dépôt (rootDir: backend).
