@@ -1,0 +1,868 @@
+{
+  "info": {
+    "name": "ChurchManager API",
+    "description": "Collection REST pour ChurchManager (Django REST Framework, multi-tenant SaaS).\n\n**Variables** : `base_url`, `token`, `refresh_token`.\n\nAprès **Login**, le script enregistre automatiquement `access` dans `token` et `refresh` dans `refresh_token`.\n\nLes routes métier exigent un JWT valide et une église (`church`) associée au compte (sauf SuperAdmin plateforme).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000" },
+    { "key": "token", "value": "" },
+    { "key": "refresh_token", "value": "" },
+    { "key": "church_id", "value": "" },
+    { "key": "fidele_id", "value": "" },
+    { "key": "cotisation_id", "value": "" },
+    { "key": "evenement_id", "value": "" },
+    { "key": "eglise_id", "value": "" },
+    { "key": "region_id", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register (nouvelle église + admin)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"church_name\": \"Église Exemple\",\n  \"church_email\": \"contact@eglise-exemple.org\",\n  \"church_phone\": \"+22501020304\",\n  \"admin_email\": \"admin@eglise-exemple.org\",\n  \"admin_password\": \"Motdepasse123!\",\n  \"admin_first_name\": \"Jean\",\n  \"admin_last_name\": \"Dupont\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/register/",
+            "description": "**Réponse 201 (exemple)**\n```json\n{\n  \"church\": { \"id\": 1, \"name\": \"Église Exemple\", \"email\": \"...\", \"phone\": \"...\", \"created_at\": \"...\" },\n  \"user\": { \"id\": 1, \"email\": \"admin@...\", \"role\": \"admin_national\", \"church\": 1 },\n  \"detail\": \"Organisation créée. Vous pouvez vous connecter.\"\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (pm.response.code === 200 && json.access) {",
+                  "    pm.collectionVariables.set('token', json.access);",
+                  "    if (json.refresh) { pm.collectionVariables.set('refresh_token', json.refresh); }",
+                  "    if (json.user && json.user.church) {",
+                  "      pm.collectionVariables.set('church_id', String(json.user.church));",
+                  "    }",
+                  "  }",
+                  "} catch (e) { console.warn(e); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@eglise-exemple.org\",\n  \"password\": \"Motdepasse123!\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/login/",
+            "description": "**Réponse 200 (exemple)**\n```json\n{\n  \"refresh\": \"eyJ...\",\n  \"access\": \"eyJ...\",\n  \"user\": {\n    \"id\": 1,\n    \"email\": \"admin@...\",\n    \"first_name\": \"Jean\",\n    \"last_name\": \"Dupont\",\n    \"full_name\": \"Jean Dupont\",\n    \"role\": \"admin_national\",\n    \"church\": 1\n  }\n}\n```\n\nLe script de test enregistre `access` → variable `token` et `refresh` → `refresh_token`."
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  var json = pm.response.json();",
+                  "  if (pm.response.code === 200 && json.access) {",
+                  "    pm.collectionVariables.set('token', json.access);",
+                  "    if (json.refresh) { pm.collectionVariables.set('refresh_token', json.refresh); }",
+                  "  }",
+                  "} catch (e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/refresh/",
+            "description": "**Réponse 200 (exemple)**\n```json\n{ \"access\": \"eyJ...\", \"refresh\": \"eyJ...\" }\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/logout/",
+            "description": "**Réponse 200**\n```json\n{ \"detail\": \"Déconnexion réussie.\" }\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Profile (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/auth/profile/",
+            "description": "**Réponse 200 (exemple)**\n```json\n{\n  \"id\": 1,\n  \"email\": \"admin@...\",\n  \"first_name\": \"Jean\",\n  \"last_name\": \"Dupont\",\n  \"full_name\": \"Jean Dupont\",\n  \"phone\": \"\",\n  \"avatar\": null,\n  \"role\": \"admin_national\",\n  \"church\": 1\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Profile (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Jean\",\n  \"last_name\": \"Martin\",\n  \"phone\": \"+22507080910\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/profile/",
+            "description": "Met à jour prénom, nom, téléphone (email et rôle en lecture seule)."
+          },
+          "response": []
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"old_password\": \"Motdepasse123!\",\n  \"new_password\": \"NouveauMotdepasse456!\",\n  \"new_password_confirm\": \"NouveauMotdepasse456!\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/change-password/",
+            "description": "**Réponse 200**\n```json\n{ \"detail\": \"Mot de passe modifié avec succès.\" }\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Users — Me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/auth/users/me/",
+            "description": "Alias profil courant via ViewSet users."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Church (Organisation)",
+      "item": [
+        {
+          "name": "Create church (Register)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"church_name\": \"Nouvelle Paroisse SaaS\",\n  \"church_email\": \"contact@nouvelle.org\",\n  \"church_phone\": \"\",\n  \"admin_email\": \"pasteur@nouvelle.org\",\n  \"admin_password\": \"Securise123!\",\n  \"admin_first_name\": \"Marie\",\n  \"admin_last_name\": \"Curé\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/register/",
+            "description": "Identique à **Auth > Register**. Crée `Church`, `National`, abonnement Free, premier utilisateur admin."
+          },
+          "response": []
+        },
+        {
+          "name": "List my church(es)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/churches/my-church/",
+            "description": "**Réponse 200 (exemple)**\n```json\n[\n  {\n    \"id\": 1,\n    \"name\": \"Église Exemple\",\n    \"email\": \"contact@...\",\n    \"phone\": \"\",\n    \"created_at\": \"2026-01-15T10:00:00Z\"\n  }\n]\n```\n\nSuperAdmin sans église : liste toutes les églises."
+          },
+          "response": []
+        },
+        {
+          "name": "Get church by id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/churches/my-church/{{church_id}}/",
+            "description": "Détail d'une église (restreint à son tenant pour les utilisateurs classiques)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update church (platform — SuperAdmin)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Église Exemple (mise à jour)\",\n  \"email\": \"nouveau@eglise.org\",\n  \"phone\": \"+22599988877\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/churches/platform/churches/{{church_id}}/",
+            "description": "Réservé au rôle **super_admin** sans tenant. Met à jour une église (ViewSet `PlatformChurchViewSet`)."
+          },
+          "response": []
+        },
+        {
+          "name": "Subscriptions — current",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/churches/subscriptions/current/",
+            "description": "**Réponse 200 (exemple)**\n```json\n{\n  \"id\": 1,\n  \"church\": 1,\n  \"plan\": \"free\",\n  \"plan_display\": \"Free\",\n  \"start_date\": \"2026-01-01\",\n  \"end_date\": null,\n  \"is_active\": true,\n  \"created_at\": \"...\"\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Subscriptions — list",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/churches/subscriptions/",
+            "description": "Historique des abonnements de l'église connectée."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/auth/users/",
+            "description": "Filtré par **church** pour les admins d'église. Query : `?role=pasteur_local&search=dupont`."
+          },
+          "response": []
+        },
+        {
+          "name": "Create user",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"tresorier@eglise.org\",\n  \"first_name\": \"Paul\",\n  \"last_name\": \"Trésorier\",\n  \"phone\": \"\",\n  \"role\": \"tresorier\",\n  \"entity_type\": \"\",\n  \"entity_id\": null,\n  \"password\": \"Motdepasse123!\",\n  \"password_confirm\": \"Motdepasse123!\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/users/",
+            "description": "Permission **admin_national** (église). Le `church` est assigné automatiquement côté serveur.\n\n**Réponse 201 (exemple)**\n```json\n{\n  \"id\": 5,\n  \"email\": \"tresorier@eglise.org\",\n  \"role\": \"tresorier\",\n  \"church\": 1\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Get user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/auth/users/1/",
+            "description": "Remplacer `1` par l'id utilisateur."
+          },
+          "response": []
+        },
+        {
+          "name": "Update user (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Paul\",\n  \"phone\": \"+22501020304\",\n  \"is_active\": true\n}"
+            },
+            "url": "{{base_url}}/api/v1/auth/users/1/",
+            "description": "Mise à jour partielle (selon permissions)."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete user",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/api/v1/auth/users/1/",
+            "description": "Suppression (permissions strictes)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Fidèles",
+      "item": [
+        {
+          "name": "List fidèles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/fideles/?statut=actif",
+            "description": "Liste paginée (25 par défaut). Filtres : `statut`, `genre`, `eglise`, `eglise__paroisse`, etc."
+          },
+          "response": []
+        },
+        {
+          "name": "Create fidèle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  if (pm.response.code === 201) {",
+                  "    var j = pm.response.json();",
+                  "    if (j.id) pm.collectionVariables.set('fidele_id', String(j.id));",
+                  "  }",
+                  "} catch (e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nom\": \"Kouassi\",\n  \"prenom\": \"Awa\",\n  \"genre\": \"F\",\n  \"situation_familiale\": \"celibataire\",\n  \"nombre_enfants\": 0,\n  \"telephone\": \"+22507010203\",\n  \"email\": \"awa.k@example.org\",\n  \"adresse\": \"Abidjan\",\n  \"eglise\": {{eglise_id}},\n  \"statut\": \"actif\",\n  \"ministeres\": []\n}"
+            },
+            "url": "{{base_url}}/api/v1/fideles/",
+            "description": "`eglise` = id d'une **EgliseLocale** de votre tenant. Remplacez `{{eglise_id}}` par un id réel (ex. depuis `GET /api/v1/eglises/`).\n\n**Réponse 201 (exemple)**\n```json\n{\n  \"id\": 12,\n  \"code_fidele\": \"AB-CD-001-001-0001-2026\",\n  \"nom\": \"Kouassi\",\n  \"prenom\": \"Awa\",\n  \"eglise\": 1\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Get fidèle",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/fideles/{{fidele_id}}/",
+            "description": "Détail fidèle (403/404 si hors tenant)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update fidèle (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"telephone\": \"+22599988877\",\n  \"notes\": \"Membre actif chorale\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/fideles/{{fidele_id}}/",
+            "description": "Mise à jour partielle."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete fidèle",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{base_url}}/api/v1/fideles/{{fidele_id}}/",
+            "description": "Suppression (permissions pasteur/trésorier selon config)."
+          },
+          "response": []
+        },
+        {
+          "name": "Statistiques fidèles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/fideles/statistiques/",
+            "description": "**Réponse 200 (exemple)**\n```json\n{\n  \"total\": 120,\n  \"actifs\": 115,\n  \"inactifs\": 3,\n  \"transferes\": 1,\n  \"decedes\": 1,\n  \"hommes\": 55,\n  \"femmes\": 65\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "QR code fidèle (PNG)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/fideles/{{fidele_id}}/qrcode/",
+            "description": "Réponse binaire `image/png`."
+          },
+          "response": []
+        },
+        {
+          "name": "Carte membre (PDF)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/fideles/{{fidele_id}}/carte_membre/",
+            "description": "Réponse `application/pdf`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cotisations",
+      "item": [
+        {
+          "name": "List cotisations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/cotisations/?statut=valide&ordering=-date_paiement",
+            "description": "Historique / liste filtrée par tenant automatiquement."
+          },
+          "response": []
+        },
+        {
+          "name": "Create cotisation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  if (pm.response.code === 201) {",
+                  "    var j = pm.response.json();",
+                  "    if (j.id) pm.collectionVariables.set('cotisation_id', String(j.id));",
+                  "  }",
+                  "} catch (e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fidele\": {{fidele_id}},\n  \"type_cotisation\": \"mensuelle_membre\",\n  \"montant\": \"5000.00\",\n  \"devise\": \"XOF\",\n  \"periode_mois\": 4,\n  \"periode_annee\": 2026,\n  \"mode_paiement\": \"wave\",\n  \"statut\": \"en_attente\",\n  \"transaction_id\": \"WAVE-REF-123456\",\n  \"notes\": \"\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/cotisations/",
+            "description": "**Réponse 201 (exemple)**\n```json\n{\n  \"id\": 42,\n  \"reference\": \"COT-202604-123456\",\n  \"fidele\": 12,\n  \"montant\": \"5000.00\",\n  \"statut\": \"en_attente\"\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Get cotisation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/cotisations/{{cotisation_id}}/",
+            "description": "Détail cotisation."
+          },
+          "response": []
+        },
+        {
+          "name": "Valider cotisation",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": "{{base_url}}/api/v1/cotisations/{{cotisation_id}}/valider/",
+            "description": "Chef de paroisse. Passe en `valide` et génère un reçu si besoin."
+          },
+          "response": []
+        },
+        {
+          "name": "Rejeter cotisation",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motif\": \"Montant incohérent\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/cotisations/{{cotisation_id}}/rejeter/",
+            "description": "Chef de paroisse."
+          },
+          "response": []
+        },
+        {
+          "name": "Résumé financier",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/cotisations/resume/",
+            "description": "**Réponse 200 (exemple)**\n```json\n{\n  \"total_collecte\": 150000.5,\n  \"nombre_cotisations\": 45,\n  \"par_type\": { \"mensuelle_membre\": 120000 },\n  \"par_mode_paiement\": { \"especes\": 80000, \"wave\": 70000.5 }\n}\n```"
+          },
+          "response": []
+        },
+        {
+          "name": "Impayés (période)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/cotisations/impayés/?mois=4&annee=2026",
+            "description": "Fidèles actifs sans cotisation mensuelle validée pour la période."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Paiements (Reçus + cotisations)",
+      "item": [
+        {
+          "name": "List reçus (paiements documentés)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/recus/",
+            "description": "Reçus générés à partir des cotisations validées. Lecture seule."
+          },
+          "response": []
+        },
+        {
+          "name": "Get reçu",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/recus/1/",
+            "description": "Remplacer `1` par l'id du reçu."
+          },
+          "response": []
+        },
+        {
+          "name": "Historique cotisations (filtres)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/cotisations/?periode_mois=4&periode_annee=2026&type_cotisation=mensuelle_membre",
+            "description": "Même ressource que **List cotisations** — sert d'historique des paiements/cotisations."
+          },
+          "response": []
+        },
+        {
+          "name": "Évolution mensuelle",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/cotisations/evolution_mensuelle/?annee=2026",
+            "description": "Montants agrégés par mois pour l'année."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Statistiques globales (tenant)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/dashboard/",
+            "description": "**Réponse 200 (exemple)**\n```json\n{\n  \"total_fideles\": 120,\n  \"total_regions\": 2,\n  \"total_districts\": 5,\n  \"total_paroisses\": 12,\n  \"total_eglises\": 24,\n  \"nouveaux_fideles_mois\": 3,\n  \"recettes_mois\": 450000,\n  \"nombre_paiements_mois\": 80,\n  \"evolution_cotisations\": [...],\n  \"repartition_regions\": [...],\n  \"taux_cotisation_mois\": 65.5,\n  \"evenements_a_venir\": 2,\n  \"alertes\": []\n}\n```\n\nDonnées filtrées par **church** de l'utilisateur connecté."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Événements",
+      "item": [
+        {
+          "name": "List events",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/evenements/?ordering=date_debut",
+            "description": "Liste des événements du tenant."
+          },
+          "response": []
+        },
+        {
+          "name": "Events à venir",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/evenements/a_venir/",
+            "description": "10 prochains événements."
+          },
+          "response": []
+        },
+        {
+          "name": "Create event",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  if (pm.response.code === 201) {",
+                  "    var j = pm.response.json();",
+                  "    if (j.id) pm.collectionVariables.set('evenement_id', String(j.id));",
+                  "  }",
+                  "} catch (e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titre\": \"Retraite de jeunesse\",\n  \"description\": \"Week-end spirituel\",\n  \"type_evenement\": \"retraite\",\n  \"date_debut\": \"2026-06-15T09:00:00Z\",\n  \"date_fin\": \"2026-06-17T18:00:00Z\",\n  \"lieu\": \"Centre de conférences\",\n  \"niveau_visibilite\": \"eglise\",\n  \"entite_id\": 1,\n  \"inscription_requise\": true,\n  \"est_public\": true,\n  \"capacite_max\": 100\n}"
+            },
+            "url": "{{base_url}}/api/v1/evenements/",
+            "description": "`entite_id` : id de l'entité selon `niveau_visibilite` (ex. église locale)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get event",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/evenements/{{evenement_id}}/",
+            "description": "Détail événement."
+          },
+          "response": []
+        },
+        {
+          "name": "Update event (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titre\": \"Retraite de jeunesse (édition)\",\n  \"capacite_max\": 120\n}"
+            },
+            "url": "{{base_url}}/api/v1/evenements/{{evenement_id}}/",
+            "description": "Mise à jour partielle."
+          },
+          "response": []
+        },
+        {
+          "name": "Inscrire fidèle à l'événement",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fidele\": {{fidele_id}}\n}"
+            },
+            "url": "{{base_url}}/api/v1/evenements/{{evenement_id}}/inscrire/",
+            "description": "**Réponse 201** — inscription créée."
+          },
+          "response": []
+        },
+        {
+          "name": "Participants événement",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/evenements/{{evenement_id}}/participants/",
+            "description": "Liste des inscriptions."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Hiérarchie",
+      "item": [
+        {
+          "name": "List national",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/national/",
+            "description": "Une entrée par église (tenant)."
+          },
+          "response": []
+        },
+        {
+          "name": "List regions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/regions/",
+            "description": "Query : `?national=1`"
+          },
+          "response": []
+        },
+        {
+          "name": "Create region",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "try {",
+                  "  if (pm.response.code === 201) {",
+                  "    var j = pm.response.json();",
+                  "    if (j.id) pm.collectionVariables.set('region_id', String(j.id));",
+                  "  }",
+                  "} catch (e) {}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"CI\",\n  \"nom\": \"Côte d'Ivoire\",\n  \"national\": 1,\n  \"description\": \"\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/regions/",
+            "description": "`national` = id du National de votre église (souvent 1 après provisionnement)."
+          },
+          "response": []
+        },
+        {
+          "name": "List districts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/districts/?region={{region_id}}",
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "List paroisses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/paroisses/",
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "List eglises",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/eglises/",
+            "description": "Utiliser un `id` pour **Create fidèle** → variable `eglise_id`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Annonces & Notifications",
+      "item": [
+        {
+          "name": "List annonces",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/annonces/",
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Create annonce",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titre\": \"Assemblée générale\",\n  \"contenu\": \"Réunion le dimanche 10h.\",\n  \"niveau_visibilite\": \"eglise\",\n  \"entite_id\": 1,\n  \"est_epingle\": true,\n  \"date_expiration\": \"2026-12-31\"\n}"
+            },
+            "url": "{{base_url}}/api/v1/annonces/",
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "List notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/notifications/",
+            "description": "Boîte de réception de l'utilisateur connecté."
+          },
+          "response": []
+        },
+        {
+          "name": "Notifications non lues",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/notifications/non_lues/",
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Rapports",
+      "item": [
+        {
+          "name": "Rapport fidèles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/rapports/fideles/?statut=actif",
+            "description": "Permission chef de paroisse."
+          },
+          "response": []
+        },
+        {
+          "name": "Rapport financier",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/v1/rapports/financier/?mois=4&annee=2026",
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Meta",
+      "item": [
+        {
+          "name": "API root",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/",
+            "description": "Découverte des liens documentation / api_v1."
+          },
+          "response": []
+        },
+        {
+          "name": "OpenAPI schema",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/api/schema/",
+            "description": "Schéma OpenAPI (drf-spectacular)."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
