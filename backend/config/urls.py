@@ -8,7 +8,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 
 
 def api_root(request):
-    from django.conf import settings as django_settings
+    from django.conf import settings as django_settings  # pyright: ignore[reportMissingImports]
     return JsonResponse({
         'name': 'ChurchManager API',
         'version': '1.0.0',
@@ -29,6 +29,7 @@ urlpatterns = [
 
     # API v1
     path('api/v1/auth/', include('accounts.urls')),
+    path('api/v1/churches/', include('churches.urls')),
     path('api/v1/', include('hierarchy.urls')),
     path('api/v1/', include('members.urls')),
     path('api/v1/', include('contributions.urls')),

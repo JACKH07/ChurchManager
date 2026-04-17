@@ -13,31 +13,49 @@ from hierarchy.models import Region, District, Paroisse, EgliseLocale
 from events.models import Evenement
 
 
+def _church_id(request):
+    return getattr(request.user, 'church_id', None)
+
+
 @extend_schema(tags=['dashboard'])
 class DashboardView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
+        cid = _church_id(request)
         now = timezone.now()
         mois_courant = now.month
         annee_courante = now.year
 
-        # Statistiques globales
+        fideles = Fidele.objects.filter(statut='actif')
+        regions = Region.objects.all()
+        districts = District.objects.all()
+        paroisses = Paroisse.objects.all()
+        eglises = EgliseLocale.objects.all()
+        cotisations = Cotisation.objects.all()
+        evenements = Evenement.objects.all()
+        if cid:
+            fideles = fideles.filter(church_id=cid)
+            regions = regions.filter(church_id=cid)
+            districts = districts.filter(church_id=cid)
+            paroisses = paroisses.filter(church_id=cid)
+            eglises = eglises.filter(church_id=cid)
+            cotisations = cotisations.filter(church_id=cid)
+            evenements = evenements.filter(church_id=cid)
+
         stats = {
-            'total_fideles': Fidele.objects.filter(statut='actif').count(),
-            'total_regions': Region.objects.count(),
-            'total_districts': District.objects.count(),
-            'total_paroisses': Paroisse.objects.count(),
-            'total_eglises': EgliseLocale.objects.count(),
-            'nouveaux_fideles_mois': Fidele.objects.filter(
+            'total_fideles': fideles.count(),
+            'total_regions': regions.count(),
+            'total_districts': districts.count(),
+            'total_paroisses': paroisses.count(),
+            'total_eglises': eglises.count(),
+            'nouveaux_fideles_mois': fideles.filter(
                 date_inscription__month=mois_courant,
                 date_inscription__year=annee_courante,
             ).count(),
         }
 
-        # Finances du mois
-        cotisations_mois = Cotisation.objects.filter(
+        cotisations_mois = cotisations.filter(
             statut='valide',
             periode_mois=mois_courant,
             periode_annee=annee_courante,
@@ -47,30 +65,24 @@ class DashboardView(APIView):
         )
         stats['nombre_paiements_mois'] = cotisations_mois.count()
 
-        # Évolution 6 derniers mois
         MOIS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
         evolution = []
         for i in range(5, -1, -1):
             m = (mois_courant - i - 1) % 12 + 1
             a = annee_courante if mois_courant - i > 0 else annee_courante - 1
-            montant = Cotisation.objects.filter(
-                statut='valide', periode_mois=m, periode_annee=a
-            ).aggregate(total=db_models.Sum('montant'))['total'] or 0
+            qcm = cotisations.filter(statut='valide', periode_mois=m, periode_annee=a)
+            montant = qcm.aggregate(total=db_models.Sum('montant'))['total'] or 0
             evolution.append({'mois': MOIS[m - 1], 'montant': float(montant), 'annee': a})
         stats['evolution_cotisations'] = evolution
 
-        # Répartition fidèles par région
         repartition_regions = []
-        for region in Region.objects.all():
-            total = Fidele.objects.filter(
-                eglise__paroisse__district__region=region, statut='actif'
-            ).count()
+        for region in regions:
+            total = fideles.filter(eglise__paroisse__district__region=region).count()
             repartition_regions.append({'region': region.nom, 'code': region.code, 'total': total})
         stats['repartition_regions'] = repartition_regions
 
-        # Taux de cotisation ce mois
-        total_fideles_actifs = Fidele.objects.filter(statut='actif').count()
-        fideles_ayant_paye = Cotisation.objects.filter(
+        total_fideles_actifs = fideles.count()
+        fideles_ayant_paye = cotisations.filter(
             type_cotisation='mensuelle_membre',
             statut='valide',
             periode_mois=mois_courant,
@@ -80,12 +92,8 @@ class DashboardView(APIView):
             (fideles_ayant_paye / total_fideles_actifs * 100) if total_fideles_actifs > 0 else 0, 1
         )
 
-        # Événements à venir
-        stats['evenements_a_venir'] = Evenement.objects.filter(
-            date_debut__gte=now
-        ).count()
+        stats['evenements_a_venir'] = evenements.filter(date_debut__gte=now).count()
 
-        # Alertes
         alertes = []
         if stats['taux_cotisation_mois'] < 50:
             alertes.append({
@@ -102,9 +110,12 @@ class RapportFidelesView(APIView):
     permission_classes = [IsChefParoisse]
 
     def get(self, request):
+        cid = _church_id(request)
         eglise_id = request.query_params.get('eglise')
         statut = request.query_params.get('statut', 'actif')
         qs = Fidele.objects.filter(statut=statut)
+        if cid:
+            qs = qs.filter(church_id=cid)
         if eglise_id:
             qs = qs.filter(eglise_id=eglise_id)
 
@@ -120,11 +131,14 @@ class RapportFinancierView(APIView):
     permission_classes = [IsChefParoisse]
 
     def get(self, request):
+        cid = _church_id(request)
         mois = int(request.query_params.get('mois', timezone.now().month))
         annee = int(request.query_params.get('annee', timezone.now().year))
         eglise_id = request.query_params.get('eglise')
 
         qs = Cotisation.objects.filter(statut='valide', periode_mois=mois, periode_annee=annee)
+        if cid:
+            qs = qs.filter(church_id=cid)
         if eglise_id:
             qs = qs.filter(fidele__eglise_id=eglise_id)
 

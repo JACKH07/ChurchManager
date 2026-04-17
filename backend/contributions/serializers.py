@@ -1,6 +1,6 @@
 from rest_framework import serializers # type: ignore from rest_framework
 from django.utils import timezone # type: ignore from django.utils
-from django.db.models import Sum # type: ignore from django.db.models
+from django.db.models import Sum # type: ignore from django.db.models   
 from .models import Cotisation, Recu, ObjectifCotisation # type: ignore from local app  
 
 
@@ -50,14 +50,17 @@ class ObjectifCotisationSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def get_taux_realisation(self, obj):
-        total = Cotisation.objects.filter(
+        qs = Cotisation.objects.filter(
             niveau_entite=obj.niveau_entite,
             entite_id=obj.entite_id,
             type_cotisation=obj.type_cotisation,
             periode_mois=obj.periode_mois,
             periode_annee=obj.periode_annee,
             statut='valide',
-        ).aggregate(total=Sum('montant'))['total'] or 0
+        )
+        if obj.church_id:
+            qs = qs.filter(church_id=obj.church_id)
+        total = qs.aggregate(total=Sum('montant'))['total'] or 0
         if obj.montant_objectif > 0:
             return round(float(total) / float(obj.montant_objectif) * 100, 2)
         return 0

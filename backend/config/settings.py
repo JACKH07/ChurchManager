@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django_filters',
     'drf_spectacular',
     # Local apps
+    'churches',
     'accounts',
     'hierarchy',
     'members',
@@ -58,6 +59,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'churches.middleware.TenantSubscriptionMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]

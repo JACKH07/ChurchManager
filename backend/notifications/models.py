@@ -9,6 +9,14 @@ class TypeNotification(models.TextChoices):
 
 
 class Notification(models.Model):
+    church = models.ForeignKey(
+        'churches.Church',
+        on_delete=models.CASCADE,
+        related_name='notifications',
+        null=True,
+        blank=True,
+        verbose_name='Église (tenant)',
+    )
     destinataire = models.ForeignKey(
         'accounts.User', on_delete=models.CASCADE, related_name='notifications'
     )
@@ -26,3 +34,8 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.titre} → {self.destinataire}"
+
+    def save(self, *args, **kwargs):
+        if self.destinataire_id and not self.church_id and getattr(self.destinataire, 'church_id', None):
+            self.church_id = self.destinataire.church_id
+        super().save(*args, **kwargs)

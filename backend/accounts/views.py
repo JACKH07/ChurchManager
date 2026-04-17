@@ -13,6 +13,7 @@ from .serializers import (
 )
 from .permissions import IsAdminNational, IsSuperAdmin
 from .audit import log_action
+from common.tenant import filter_queryset_for_tenant
 
 User = get_user_model()
 
@@ -84,6 +85,12 @@ class UserViewSet(viewsets.ModelViewSet):
     filterset_fields = ['role', 'is_active', 'entity_type']
     search_fields = ['email', 'first_name', 'last_name']
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if getattr(self, 'swagger_fake_view', False):
+            return qs
+        return filter_queryset_for_tenant(qs, self.request.user)
+
     def get_serializer_class(self):
         if self.action == 'create':
             return UserCreateSerializer
@@ -95,10 +102,14 @@ class UserViewSet(viewsets.ModelViewSet):
         return super().get_permissions()
 
     def perform_create(self, serializer):
-        user = serializer.save()
-        log_action(self.request.user, 'create_user', 'User',
-                   object_id=user.pk,
-                   details={'email': user.email, 'role': user.role},
+        current = self.request.user
+        if getattr(current, 'church_id', None):
+            new_user = serializer.save(church=current.church)
+        else:
+            new_user = serializer.save()
+        log_action(current, 'create_user', 'User',
+                   object_id=new_user.pk,
+                   details={'email': new_user.email, 'role': new_user.role},
                    request=self.request)
 
     def perform_destroy(self, instance):

@@ -1,5 +1,5 @@
-from django.db import models, transaction
-from django.utils import timezone
+from django.db import models, transaction  # pyright: ignore[reportMissingImports]
+from django.utils import timezone  # pyright: ignore[reportMissingImports]
 from hierarchy.models import EgliseLocale
 
 
@@ -46,6 +46,14 @@ def generate_code_fidele(eglise: EgliseLocale, annee: int = None) -> str:
 
 
 class Ministere(models.Model):
+    church = models.ForeignKey(
+        'churches.Church',
+        on_delete=models.CASCADE,
+        related_name='ministeres',
+        null=True,
+        blank=True,
+        verbose_name='Église (tenant)',
+    )
     nom = models.CharField(max_length=100, verbose_name='Nom du ministère')
     description = models.TextField(blank=True)
     eglise = models.ForeignKey(EgliseLocale, on_delete=models.CASCADE, related_name='ministeres')
@@ -59,8 +67,21 @@ class Ministere(models.Model):
     def __str__(self):
         return f"{self.nom} - {self.eglise.nom}"
 
+    def save(self, *args, **kwargs):
+        if self.eglise_id and not self.church_id and self.eglise.church_id:
+            self.church_id = self.eglise.church_id
+        super().save(*args, **kwargs)
+
 
 class Fidele(models.Model):
+    church = models.ForeignKey(
+        'churches.Church',
+        on_delete=models.CASCADE,
+        related_name='fideles',
+        null=True,
+        blank=True,
+        verbose_name='Église (tenant)',
+    )
     code_fidele = models.CharField(max_length=30, unique=True, verbose_name='Code d\'identification', editable=False)
     nom = models.CharField(max_length=100, verbose_name='Nom')
     prenom = models.CharField(max_length=100, verbose_name='Prénom')
@@ -100,6 +121,8 @@ class Fidele(models.Model):
         return f"{self.nom} {self.prenom} [{self.code_fidele}]"
 
     def save(self, *args, **kwargs):
+        if self.eglise_id and not self.church_id and self.eglise.church_id:
+            self.church_id = self.eglise.church_id
         if not self.code_fidele:
             self.code_fidele = generate_code_fidele(self.eglise, self.date_inscription.year)
         super().save(*args, **kwargs)
@@ -119,6 +142,14 @@ class Fidele(models.Model):
 
 
 class TransfertFidele(models.Model):
+    church = models.ForeignKey(
+        'churches.Church',
+        on_delete=models.CASCADE,
+        related_name='transferts_fideles',
+        null=True,
+        blank=True,
+        verbose_name='Église (tenant)',
+    )
     fidele = models.ForeignKey(Fidele, on_delete=models.CASCADE, related_name='transferts')
     eglise_origine = models.ForeignKey(EgliseLocale, on_delete=models.CASCADE, related_name='transferts_sortants')
     eglise_destination = models.ForeignKey(EgliseLocale, on_delete=models.CASCADE, related_name='transferts_entrants')
@@ -137,3 +168,8 @@ class TransfertFidele(models.Model):
 
     def __str__(self):
         return f"Transfert de {self.fidele} : {self.eglise_origine} → {self.eglise_destination}"
+
+    def save(self, *args, **kwargs):
+        if self.fidele_id and not self.church_id and self.fidele.church_id:
+            self.church_id = self.fidele.church_id
+        super().save(*args, **kwargs)

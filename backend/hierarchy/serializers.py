@@ -8,6 +8,7 @@ class NationalSerializer(serializers.ModelSerializer):
     class Meta:
         model = National
         fields = '__all__'
+        read_only_fields = ['church']
 
     def get_total_regions(self, obj):
         return obj.regions.count()
@@ -29,14 +30,23 @@ class RegionSerializer(serializers.ModelSerializer):
         return obj.districts.count()
 
     def validate(self, attrs):
-        # Si national n'est pas fourni, utiliser le premier (ou créer un par défaut)
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
         if 'national' not in attrs or attrs.get('national') is None:
-            national = National.objects.first()
-            if national is None:
-                raise serializers.ValidationError(
-                    {'national': "Aucune organisation nationale n'existe. Créez-en une d'abord dans l'administration."}
-                )
-            attrs['national'] = national
+            if user and getattr(user, 'church_id', None):
+                national = National.objects.filter(church=user.church).first()
+                if not national:
+                    raise serializers.ValidationError(
+                        {'national': "Aucune organisation nationale pour cette église."}
+                    )
+                attrs['national'] = national
+            else:
+                national = National.objects.first()
+                if national is None:
+                    raise serializers.ValidationError(
+                        {'national': "Aucune organisation nationale n'existe."}
+                    )
+                attrs['national'] = national
         return attrs
 
 

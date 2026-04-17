@@ -14,7 +14,9 @@ from drf_spectacular.utils import extend_schema  # pyright: ignore[reportMissing
 
 from .models import Fidele, Ministere, TransfertFidele
 from .serializers import FideleSerializer, FideleListSerializer, MinistereSerializer, TransfertFideleSerializer
-from accounts.permissions import IsAuthenticated, IsChefParoisse, IsPasteurLocal
+from churches.limits import assert_can_add_fidele
+
+from accounts.permissions import IsAuthenticated, IsChefParoisse, IsPasteurLocal, IsPasteurOrTresorier
 from accounts.mixins import ScopedQuerysetMixin
 
 
@@ -43,8 +45,16 @@ class FideleViewSet(ScopedQuerysetMixin, viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsPasteurLocal()]
+            return [IsPasteurOrTresorier()]
         return [IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        assert_can_add_fidele(self.request.user)
+        u = self.request.user
+        if getattr(u, 'church_id', None):
+            serializer.save(church=u.church)
+        else:
+            serializer.save()
 
     @action(detail=True, methods=['get'])
     def carte_membre(self, request, pk=None):
@@ -122,7 +132,10 @@ class FideleViewSet(ScopedQuerysetMixin, viewsets.ModelViewSet):
             'eglise_origine': fidele.eglise.id,
         })
         serializer.is_valid(raise_exception=True)
-        transfert = serializer.save(approuve_par=request.user)
+        transfert = serializer.save(
+            approuve_par=request.user,
+            church=fidele.church,
+        )
         # Le fidèle reste actif dans sa nouvelle église
         fidele.eglise = transfert.eglise_destination
         fidele.statut = 'actif'
@@ -145,18 +158,41 @@ class FideleViewSet(ScopedQuerysetMixin, viewsets.ModelViewSet):
 
 @extend_schema(tags=['members'])
 class MinistereViewSet(viewsets.ModelViewSet):
-    queryset = Ministere.objects.select_related('eglise').all()
+    queryset = Ministere.objects.select_related('eglise', 'church').all()
     serializer_class = MinistereSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['eglise']
     search_fields = ['nom']
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        from common.tenant import filter_queryset_for_tenant
+
+        qs = super().get_queryset()
+        if getattr(self, 'swagger_fake_view', False):
+            return qs
+        return filter_queryset_for_tenant(qs, self.request.user)
+
+    def perform_create(self, serializer):
+        u = self.request.user
+        if getattr(u, 'church_id', None):
+            serializer.save(church=u.church)
+        else:
+            serializer.save()
+
 
 @extend_schema(tags=['members'])
 class TransfertFideleViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = TransfertFidele.objects.select_related('fidele', 'eglise_origine', 'eglise_destination').all()
+    queryset = TransfertFidele.objects.select_related('fidele', 'eglise_origine', 'eglise_destination', 'church').all()
     serializer_class = TransfertFideleSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['fidele', 'eglise_origine', 'eglise_destination']
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        from common.tenant import filter_queryset_for_tenant
+
+        qs = super().get_queryset()
+        if getattr(self, 'swagger_fake_view', False):
+            return qs
+        return filter_queryset_for_tenant(qs, self.request.user)

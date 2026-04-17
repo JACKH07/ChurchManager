@@ -6,18 +6,21 @@ from rest_framework.response import Response # type: ignore from rest_framework.
 from django_filters.rest_framework import DjangoFilterBackend # type: ignore from django_filters.rest_framework
 from drf_spectacular.utils import extend_schema # type: ignore from drf_spectacular.utils
 
+from common.tenant import filter_queryset_for_tenant
+from common.viewsets import TenantScopedModelViewSet, TenantScopedReadOnlyModelViewSet
+
 from .models import Cotisation, Recu, ObjectifCotisation
 from .serializers import (
     CotisationSerializer, CotisationListSerializer,
     RecuSerializer, ObjectifCotisationSerializer,
 )
-from accounts.permissions import IsAuthenticated, IsPasteurLocal, IsChefParoisse
+from accounts.permissions import IsAuthenticated, IsChefParoisse, IsPasteurOrTresorier
 from accounts.mixins import ScopedQuerysetMixin
 
 
 @extend_schema(tags=['contributions'])
-class CotisationViewSet(ScopedQuerysetMixin, viewsets.ModelViewSet):
-    queryset = Cotisation.objects.select_related('fidele', 'enregistre_par', 'valide_par').all()
+class CotisationViewSet(ScopedQuerysetMixin, TenantScopedModelViewSet):
+    queryset = Cotisation.objects.select_related('fidele', 'enregistre_par', 'valide_par', 'church').all()
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = [
         'type_cotisation', 'statut', 'mode_paiement',
@@ -43,7 +46,7 @@ class CotisationViewSet(ScopedQuerysetMixin, viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update']:
-            return [IsPasteurLocal()]
+            return [IsPasteurOrTresorier()]
         if self.action == 'destroy':
             return [IsChefParoisse()]
         return [IsAuthenticated()]
@@ -74,7 +77,7 @@ class CotisationViewSet(ScopedQuerysetMixin, viewsets.ModelViewSet):
         numero = f"REC-{timezone.now().year}{timezone.now().month:02d}-{''.join([str(random.randint(0,9)) for _ in range(6)])}"
         Recu.objects.get_or_create(
             cotisation=cotisation,
-            defaults={'numero_recu': numero, 'genere_par': user}
+            defaults={'numero_recu': numero, 'genere_par': user, 'church': cotisation.church},
         )
 
     @action(detail=False, methods=['get'])
@@ -120,16 +123,23 @@ class CotisationViewSet(ScopedQuerysetMixin, viewsets.ModelViewSet):
         eglise_id = request.query_params.get('eglise')
 
         from members.models import Fidele
-        fideles_qs = Fidele.objects.filter(statut='actif')
+        fideles_qs = filter_queryset_for_tenant(
+            Fidele.objects.filter(statut='actif'),
+            request.user,
+        )
         if eglise_id:
             fideles_qs = fideles_qs.filter(eglise_id=eglise_id)
 
-        fideles_ayant_paye = Cotisation.objects.filter(
-            type_cotisation='mensuelle_membre',
-            periode_mois=mois,
-            periode_annee=annee,
-            statut='valide',
-        ).values_list('fidele_id', flat=True)
+        cot_qs = filter_queryset_for_tenant(
+            Cotisation.objects.filter(
+                type_cotisation='mensuelle_membre',
+                periode_mois=mois,
+                periode_annee=annee,
+                statut='valide',
+            ),
+            request.user,
+        )
+        fideles_ayant_paye = cot_qs.values_list('fidele_id', flat=True)
 
         impayés = fideles_qs.exclude(id__in=fideles_ayant_paye)
         from members.serializers import FideleListSerializer
@@ -138,8 +148,8 @@ class CotisationViewSet(ScopedQuerysetMixin, viewsets.ModelViewSet):
 
 
 @extend_schema(tags=['contributions'])
-class RecuViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Recu.objects.select_related('cotisation', 'genere_par').all()
+class RecuViewSet(TenantScopedReadOnlyModelViewSet):
+    queryset = Recu.objects.select_related('cotisation', 'genere_par', 'church').all()
     serializer_class = RecuSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['cotisation__fidele', 'genere_par']
@@ -147,8 +157,8 @@ class RecuViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 @extend_schema(tags=['contributions'])
-class ObjectifCotisationViewSet(viewsets.ModelViewSet):
-    queryset = ObjectifCotisation.objects.all()
+class ObjectifCotisationViewSet(TenantScopedModelViewSet):
+    queryset = ObjectifCotisation.objects.select_related('church').all()
     serializer_class = ObjectifCotisationSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['niveau_entite', 'entite_id', 'type_cotisation', 'periode_annee']

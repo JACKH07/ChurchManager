@@ -4,14 +4,17 @@ from rest_framework.response import Response # type: ignore from rest_framework.
 from django_filters.rest_framework import DjangoFilterBackend # type: ignore from django_filters.rest_framework
 from drf_spectacular.utils import extend_schema # type: ignore from drf_spectacular.utils
 
+from common.viewsets import TenantScopedModelViewSet
+
 from .models import Evenement, InscriptionEvenement, Annonce
 from .serializers import EvenementSerializer, InscriptionEvenementSerializer, AnnonceSerializer
+from accounts.models import UserRole
 from accounts.permissions import IsAuthenticated, IsPasteurLocal
 
 
 @extend_schema(tags=['events'])
-class EvenementViewSet(viewsets.ModelViewSet):
-    queryset = Evenement.objects.select_related('createur').all()
+class EvenementViewSet(TenantScopedModelViewSet):
+    queryset = Evenement.objects.select_related('createur', 'church').all()
     serializer_class = EvenementSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['niveau_visibilite', 'type_evenement', 'est_public', 'inscription_requise']
@@ -32,18 +35,18 @@ class EvenementViewSet(viewsets.ModelViewSet):
         if not fidele_id:
             return Response({'detail': 'Le champ fidele est requis.'}, status=400)
 
-        # Vérifier que le fidèle existe
         from members.models import Fidele
         try:
             fidele = Fidele.objects.get(pk=fidele_id)
         except Fidele.DoesNotExist:
             return Response({'detail': 'Fidèle introuvable.'}, status=404)
 
-        # Un pasteur/chef ne peut inscrire que les fidèles de son église/paroisse
         user = request.user
-        if not user.is_at_least('admin_national'):
+        if request.user.church_id and fidele.church_id != request.user.church_id:
+            return Response({'detail': 'Fidèle hors de votre organisation.'}, status=403)
+        if not user.is_at_least(UserRole.ADMIN_NATIONAL):
             if user.entity_id and fidele.eglise_id != user.entity_id:
-                if not user.is_at_least('chef_paroisse'):
+                if not user.is_at_least(UserRole.CHEF_PAROISSE):
                     return Response(
                         {'detail': 'Vous ne pouvez pas inscrire un fidèle hors de votre périmètre.'},
                         status=403
@@ -56,7 +59,7 @@ class EvenementViewSet(viewsets.ModelViewSet):
         inscription, created = InscriptionEvenement.objects.get_or_create(
             evenement=evenement,
             fidele=fidele,
-            defaults={'statut': statut_inscription}
+            defaults={'statut': statut_inscription, 'church': evenement.church},
         )
         if not created:
             return Response({'detail': 'Ce fidèle est déjà inscrit à cet événement.'}, status=400)
@@ -78,8 +81,8 @@ class EvenementViewSet(viewsets.ModelViewSet):
 
 
 @extend_schema(tags=['events'])
-class AnnonceViewSet(viewsets.ModelViewSet):
-    queryset = Annonce.objects.select_related('auteur').all()
+class AnnonceViewSet(TenantScopedModelViewSet):
+    queryset = Annonce.objects.select_related('auteur', 'church').all()
     serializer_class = AnnonceSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['niveau_visibilite', 'est_epingle', 'entite_id']

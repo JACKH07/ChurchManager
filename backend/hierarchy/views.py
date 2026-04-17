@@ -1,8 +1,11 @@
 from rest_framework import viewsets, filters # type: ignore from rest_framework 
 from rest_framework.decorators import action # type: ignore from rest_framework.decorators
+from rest_framework.exceptions import ValidationError # type: ignore from rest_framework.exceptions
 from rest_framework.response import Response # type: ignore from rest_framework.response
 from django_filters.rest_framework import DjangoFilterBackend # type: ignore from django_filters.rest_framework
 from drf_spectacular.utils import extend_schema, extend_schema_view # type: ignore from drf_spectacular.utils
+
+from common.viewsets import TenantScopedModelViewSet
 
 from .models import National, Region, District, Paroisse, EgliseLocale
 from .serializers import (
@@ -13,7 +16,7 @@ from accounts.permissions import IsAdminNational, IsAdminRegion, IsAuthenticated
 
 
 @extend_schema(tags=['hierarchy'])
-class NationalViewSet(viewsets.ModelViewSet):
+class NationalViewSet(TenantScopedModelViewSet):
     queryset = National.objects.all()
     serializer_class = NationalSerializer
     permission_classes = [IsAuthenticated]
@@ -23,14 +26,20 @@ class NationalViewSet(viewsets.ModelViewSet):
             return [IsAdminNational()]
         return [IsAuthenticated()]
 
+    def perform_create(self, serializer):
+        user = self.request.user
+        if getattr(user, 'church_id', None) and National.objects.filter(church_id=user.church_id).exists():
+            raise ValidationError({'detail': 'Une organisation nationale existe déjà pour cette église.'})
+        super().perform_create(serializer)
+
 
 @extend_schema(tags=['hierarchy'])
 @extend_schema_view(
     list=extend_schema(summary='Liste des régions'),
     create=extend_schema(summary='Créer une région'),
 )
-class RegionViewSet(viewsets.ModelViewSet):
-    queryset = Region.objects.select_related('national', 'responsable').all()
+class RegionViewSet(TenantScopedModelViewSet):
+    queryset = Region.objects.select_related('national', 'responsable', 'church').all()
     serializer_class = RegionSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['national']
@@ -74,8 +83,8 @@ class RegionViewSet(viewsets.ModelViewSet):
 
 
 @extend_schema(tags=['hierarchy'])
-class DistrictViewSet(viewsets.ModelViewSet):
-    queryset = District.objects.select_related('region', 'superviseur').all()
+class DistrictViewSet(TenantScopedModelViewSet):
+    queryset = District.objects.select_related('region', 'superviseur', 'church').all()
     serializer_class = DistrictSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['region']
@@ -88,8 +97,8 @@ class DistrictViewSet(viewsets.ModelViewSet):
 
 
 @extend_schema(tags=['hierarchy'])
-class ParoisseViewSet(viewsets.ModelViewSet):
-    queryset = Paroisse.objects.select_related('district__region', 'chef').all()
+class ParoisseViewSet(TenantScopedModelViewSet):
+    queryset = Paroisse.objects.select_related('district__region', 'chef', 'church').all()
     serializer_class = ParoisseSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['district', 'district__region']
@@ -103,8 +112,8 @@ class ParoisseViewSet(viewsets.ModelViewSet):
 
 
 @extend_schema(tags=['hierarchy'])
-class EgliseLocaleViewSet(viewsets.ModelViewSet):
-    queryset = EgliseLocale.objects.select_related('paroisse__district__region', 'pasteur').all()
+class EgliseLocaleViewSet(TenantScopedModelViewSet):
+    queryset = EgliseLocale.objects.select_related('paroisse__district__region', 'pasteur', 'church').all()
     serializer_class = EgliseLocaleSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['paroisse', 'paroisse__district', 'paroisse__district__region']

@@ -1,7 +1,9 @@
 from rest_framework import viewsets, status # type: ignore from rest_framework          
 from rest_framework.decorators import action # type: ignore from rest_framework.decorators
 from rest_framework.response import Response # type: ignore from rest_framework.response
-from rest_framework.permissions import IsAuthenticated # type: ignore from rest_framework.permissions
+from rest_framework.permissions import IsAuthenticated  # type: ignore from rest_framework.permissions
+
+from common.tenant import filter_queryset_for_tenant
 from drf_spectacular.utils import extend_schema # type: ignore from drf_spectacular.utils
 
 from .models import Notification
@@ -17,12 +19,15 @@ class NotificationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
             return Notification.objects.none()
-        return Notification.objects.filter(
-            destinataire=self.request.user
-        ).order_by('-created_at')
+        qs = Notification.objects.filter(destinataire=self.request.user).order_by('-created_at')
+        return filter_queryset_for_tenant(qs, self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(destinataire=self.request.user)
+        u = self.request.user
+        if getattr(u, 'church_id', None):
+            serializer.save(destinataire=u, church=u.church)
+        else:
+            serializer.save(destinataire=u)
 
     @action(detail=False, methods=['post'])
     def marquer_toutes_lues(self, request):

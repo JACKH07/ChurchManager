@@ -2,7 +2,7 @@
 from .models import AuditLog
 
 
-def log_action(user, action: str, model_name: str, object_id=None, details: dict = None, request=None):
+def log_action(user, action: str, model_name: str, object_id=None, details: dict = None, request=None, church=None):
     """
     Enregistre une action dans le journal d'audit.
 
@@ -18,8 +18,13 @@ def log_action(user, action: str, model_name: str, object_id=None, details: dict
         else:
             ip_address = request.META.get('REMOTE_ADDR')
 
+    ch = church
+    if ch is None and user and user.is_authenticated:
+        ch = getattr(user, 'church', None)
+
     AuditLog.objects.create(
         user=user if user and user.is_authenticated else None,
+        church=ch,
         action=action,
         model_name=model_name,
         object_id=str(object_id) if object_id else '',

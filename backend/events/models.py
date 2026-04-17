@@ -22,6 +22,14 @@ class TypeEvenement(models.TextChoices):
 
 
 class Evenement(models.Model):
+    church = models.ForeignKey(
+        'churches.Church',
+        on_delete=models.CASCADE,
+        related_name='evenements',
+        null=True,
+        blank=True,
+        verbose_name='Église (tenant)',
+    )
     titre = models.CharField(max_length=300, verbose_name='Titre')
     description = models.TextField(blank=True)
     type_evenement = models.CharField(max_length=30, choices=TypeEvenement.choices, default=TypeEvenement.AUTRE)
@@ -47,6 +55,11 @@ class Evenement(models.Model):
     def __str__(self):
         return f"{self.titre} ({self.date_debut.strftime('%d/%m/%Y')})"
 
+    def save(self, *args, **kwargs):
+        if self.createur_id and not self.church_id and getattr(self.createur, 'church_id', None):
+            self.church_id = self.createur.church_id
+        super().save(*args, **kwargs)
+
     @property
     def places_disponibles(self):
         if self.capacite_max:
@@ -59,6 +72,14 @@ class Evenement(models.Model):
 
 
 class InscriptionEvenement(models.Model):
+    church = models.ForeignKey(
+        'churches.Church',
+        on_delete=models.CASCADE,
+        related_name='inscriptions_evenements',
+        null=True,
+        blank=True,
+        verbose_name='Église (tenant)',
+    )
     class StatutInscription(models.TextChoices):
         EN_ATTENTE = 'en_attente', 'En attente'
         CONFIRME = 'confirme', 'Confirmé'
@@ -80,8 +101,21 @@ class InscriptionEvenement(models.Model):
     def __str__(self):
         return f"{self.fidele.nom_complet} → {self.evenement.titre}"
 
+    def save(self, *args, **kwargs):
+        if self.evenement_id and not self.church_id and self.evenement.church_id:
+            self.church_id = self.evenement.church_id
+        super().save(*args, **kwargs)
+
 
 class Annonce(models.Model):
+    church = models.ForeignKey(
+        'churches.Church',
+        on_delete=models.CASCADE,
+        related_name='annonces',
+        null=True,
+        blank=True,
+        verbose_name='Église (tenant)',
+    )
     titre = models.CharField(max_length=300)
     contenu = models.TextField()
     niveau_visibilite = models.CharField(max_length=20, choices=NiveauVisibilite.choices)
@@ -98,6 +132,11 @@ class Annonce(models.Model):
 
     def __str__(self):
         return self.titre
+
+    def save(self, *args, **kwargs):
+        if self.auteur_id and not self.church_id and getattr(self.auteur, 'church_id', None):
+            self.church_id = self.auteur.church_id
+        super().save(*args, **kwargs)
 
     @property
     def est_expiree(self):

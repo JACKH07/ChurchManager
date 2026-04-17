@@ -1,4 +1,4 @@
-from rest_framework.permissions import BasePermission, IsAuthenticated  # noqa: F401 (re-export IsAuthenticated)
+from rest_framework.permissions import BasePermission, IsAuthenticated  # noqa: F401 (re-export IsAuthenticated)  # pyright: ignore[reportMissingImports]
 from .models import UserRole
 
 
@@ -30,6 +30,21 @@ class IsChefParoisse(BasePermission):
 class IsPasteurLocal(BasePermission):
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.is_at_least(UserRole.PASTEUR_LOCAL)
+
+
+class IsTresorier(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.is_at_least(UserRole.TRESORIER)
+
+
+class IsPasteurOrTresorier(BasePermission):
+    """Pasteur local ou trésorier (gestion cotisations / fidèles côté local)."""
+
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and (
+            request.user.is_at_least(UserRole.PASTEUR_LOCAL)
+            or request.user.role == UserRole.TRESORIER
+        )
 
 
 class IsReadOnly(BasePermission):

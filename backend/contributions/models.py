@@ -41,6 +41,14 @@ class NiveauEntite(models.TextChoices):
 
 
 class Cotisation(models.Model):
+    church = models.ForeignKey(
+        'churches.Church',
+        on_delete=models.CASCADE,
+        related_name='cotisations',
+        null=True,
+        blank=True,
+        verbose_name='Église (tenant)',
+    )
     reference = models.CharField(max_length=20, unique=True, editable=False, verbose_name='Référence')
     fidele = models.ForeignKey(
         'members.Fidele', on_delete=models.CASCADE, null=True, blank=True,
@@ -82,6 +90,8 @@ class Cotisation(models.Model):
         return f"{self.reference} - {source} - {self.montant} {self.devise}"
 
     def save(self, *args, **kwargs):
+        if self.fidele_id and not self.church_id and self.fidele.church_id:
+            self.church_id = self.fidele.church_id
         if not self.reference:
             self.reference = self._generate_reference()
         super().save(*args, **kwargs)
@@ -95,6 +105,14 @@ class Cotisation(models.Model):
 
 
 class Recu(models.Model):
+    church = models.ForeignKey(
+        'churches.Church',
+        on_delete=models.CASCADE,
+        related_name='recus',
+        null=True,
+        blank=True,
+        verbose_name='Église (tenant)',
+    )
     cotisation = models.OneToOneField(Cotisation, on_delete=models.CASCADE, related_name='recu')
     numero_recu = models.CharField(max_length=20, unique=True)
     genere_le = models.DateTimeField(auto_now_add=True)
@@ -108,8 +126,21 @@ class Recu(models.Model):
     def __str__(self):
         return f"Reçu {self.numero_recu} - {self.cotisation.reference}"
 
+    def save(self, *args, **kwargs):
+        if self.cotisation_id and not self.church_id and self.cotisation.church_id:
+            self.church_id = self.cotisation.church_id
+        super().save(*args, **kwargs)
+
 
 class ObjectifCotisation(models.Model):
+    church = models.ForeignKey(
+        'churches.Church',
+        on_delete=models.CASCADE,
+        related_name='objectifs_cotisation',
+        null=True,
+        blank=True,
+        verbose_name='Église (tenant)',
+    )
     """Objectifs de collecte par période"""
     niveau_entite = models.CharField(max_length=20, choices=NiveauEntite.choices)
     entite_id = models.PositiveIntegerField()
@@ -121,4 +152,9 @@ class ObjectifCotisation(models.Model):
 
     class Meta:
         verbose_name = 'Objectif de cotisation'
-        unique_together = [['niveau_entite', 'entite_id', 'type_cotisation', 'periode_mois', 'periode_annee']]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['church', 'niveau_entite', 'entite_id', 'type_cotisation', 'periode_mois', 'periode_annee'],
+                name='contrib_objectif_church_periode_uniq',
+            ),
+        ]

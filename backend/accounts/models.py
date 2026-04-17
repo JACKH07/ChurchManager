@@ -10,6 +10,7 @@ class UserRole(models.TextChoices):
     SUPERVISEUR_DISTRICT = 'superviseur_district', 'Superviseur de District'
     CHEF_PAROISSE = 'chef_paroisse', 'Chef de Paroisse'
     PASTEUR_LOCAL = 'pasteur_local', 'Pasteur Local'
+    TRESORIER = 'tresorier', 'Trésorier'
     FIDELE = 'fidele', 'Fidèle'
 
 
@@ -39,6 +40,14 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin):
+    church = models.ForeignKey(
+        'churches.Church',
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='users',
+        verbose_name='Église (tenant)',
+    )
     email = models.EmailField(unique=True, verbose_name='Adresse email')
     first_name = models.CharField(max_length=100, verbose_name='Prénom')
     last_name = models.CharField(max_length=100, verbose_name='Nom')
@@ -75,6 +84,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     def is_at_least(self, role):
         hierarchy = [
             UserRole.FIDELE,
+            UserRole.TRESORIER,
             UserRole.PASTEUR_LOCAL,
             UserRole.CHEF_PAROISSE,
             UserRole.SUPERVISEUR_DISTRICT,
@@ -88,6 +98,14 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class AuditLog(models.Model):
+    church = models.ForeignKey(
+        'churches.Church',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='audit_logs',
+        verbose_name='Église',
+    )
     user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='audit_logs')
     action = models.CharField(max_length=200)
     model_name = models.CharField(max_length=100)

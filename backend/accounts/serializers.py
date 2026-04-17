@@ -15,6 +15,16 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['role'] = user.role
         token['entity_type'] = user.entity_type
         token['entity_id'] = user.entity_id
+        if getattr(user, 'church_id', None):
+            token['church_id'] = user.church_id
+            from churches.models import Subscription
+
+            sub = (
+                Subscription.objects.filter(church_id=user.church_id, is_active=True)
+                .order_by('-created_at')
+                .first()
+            )
+            token['subscription_plan'] = sub.plan if sub else 'free'
         return token
 
     def validate(self, attrs):
@@ -30,10 +40,10 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'email', 'first_name', 'last_name', 'full_name',
-            'phone', 'role', 'entity_type', 'entity_id',
+            'phone', 'role', 'entity_type', 'entity_id', 'church',
             'is_active', 'date_joined', 'last_login', 'avatar',
         ]
-        read_only_fields = ['id', 'date_joined', 'last_login']
+        read_only_fields = ['id', 'date_joined', 'last_login', 'church']
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
@@ -78,5 +88,5 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'full_name', 'phone', 'avatar', 'role']
-        read_only_fields = ['id', 'email', 'role']
+        fields = ['id', 'email', 'first_name', 'last_name', 'full_name', 'phone', 'avatar', 'role', 'church']
+        read_only_fields = ['id', 'email', 'role', 'church']

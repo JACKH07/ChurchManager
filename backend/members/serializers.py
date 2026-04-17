@@ -49,4 +49,13 @@ class TransfertFideleSerializer(serializers.ModelSerializer):
     class Meta:
         model = TransfertFidele
         fields = '__all__'
-        read_only_fields = ['approuve_par', 'created_at']
+        read_only_fields = ['approuve_par', 'created_at', 'church']
+
+    def validate(self, attrs):
+        orig = attrs.get('eglise_origine') or getattr(self.instance, 'eglise_origine', None)
+        dest = attrs.get('eglise_destination') or getattr(self.instance, 'eglise_destination', None)
+        if orig and dest and orig.church_id != dest.church_id:
+            raise serializers.ValidationError(
+                {'eglise_destination': 'Le transfert doit rester au sein de la même organisation.'}
+            )
+        return attrs
