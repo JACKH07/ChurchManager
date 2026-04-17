@@ -2,6 +2,13 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
+import appLogoUrl from './assets/image/logochuch.png'
+
+const favicon = document.querySelector("link[rel='icon']")
+if (favicon instanceof HTMLLinkElement) {
+  favicon.href = appLogoUrl
+  favicon.type = 'image/png'
+}
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -38,7 +45,7 @@ class ErrorBoundary extends React.Component<
             boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⛪</div>
+            <img src={appLogoUrl} alt="" style={{ width: 56, height: 56, objectFit: 'contain', marginBottom: '1rem' }} />
             <h1 style={{ color: '#1e3a8a', fontSize: '1.5rem', marginBottom: '0.5rem' }}>
               ChurchManager
             </h1>

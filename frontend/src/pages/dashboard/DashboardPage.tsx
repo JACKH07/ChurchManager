@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   Users, Building2, TrendingUp, CreditCard, AlertTriangle,
-  Calendar, MapPin, Activity, Church,
+  Calendar, MapPin, Activity,
 } from 'lucide-react';
+import { AppLogo } from '../../components/branding/AppLogo';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -62,8 +63,8 @@ export const DashboardPage = () => {
               {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
           </div>
-          <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
-            <Church size={30} className="text-white" />
+          <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center p-2">
+            <AppLogo className="max-h-full max-w-full" />
           </div>
         </div>
         {stats?.alertes?.length > 0 && (

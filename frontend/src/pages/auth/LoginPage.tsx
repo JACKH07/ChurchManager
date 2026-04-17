@@ -3,7 +3,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate } from 'react-router-dom';
-import { Church, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { AppLogo } from '../../components/branding/AppLogo';
 import { authApi, LoginPayload } from '../../api/auth';
 import { useAuthStore } from '../../store/authStore';
 import { Spinner } from '../../components/ui/Spinner';
@@ -48,8 +49,8 @@ export const LoginPage = () => {
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-br from-primary-700 to-purple-700 px-8 py-10 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/20 backdrop-blur mb-4">
-              <Church size={32} className="text-white" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/20 backdrop-blur mb-4 p-2">
+              <AppLogo className="h-full w-full max-h-11" />
             </div>
             <h1 className="text-2xl font-bold text-white">ChurchManager</h1>
             <p className="text-blue-200 text-sm mt-1">Système de gestion ecclésiastique</p>

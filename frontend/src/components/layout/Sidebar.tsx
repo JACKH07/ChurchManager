@@ -1,11 +1,12 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, CreditCard, Building2, Calendar,
-  Bell, BarChart3, Settings, ChevronDown, Church, LogOut, X,
+  Bell, BarChart3, Settings, ChevronDown, LogOut, X,
 } from 'lucide-react';
+import { AppLogo } from '../branding/AppLogo';
 import { useState } from 'react';
 import { cn } from '../../utils/cn';
-import { useAuthStore, hasMinRole } from '../../store/authStore';
+import { useAuthStore } from '../../store/authStore';
 
 interface SidebarProps { isOpen: boolean; onClose: () => void; }
 
@@ -101,8 +102,8 @@ export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         {/* Logo */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-700 to-purple-600 flex items-center justify-center">
-              <Church size={18} className="text-white" />
+            <div className="w-9 h-9 rounded-xl bg-white ring-1 ring-gray-200 flex items-center justify-center overflow-hidden p-1">
+              <AppLogo className="h-full w-full" />
             </div>
             <div>
               <p className="font-bold text-gray-900 text-sm leading-tight">ChurchManager</p>
