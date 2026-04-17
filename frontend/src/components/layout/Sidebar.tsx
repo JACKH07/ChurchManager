@@ -83,9 +83,7 @@ const NavItemComponent = ({ item }: { item: NavItem }) => {
 export const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const { user, logout } = useAuthStore();
 
-  const visibleItems = NAV_ITEMS.filter(item =>
-    !item.minRole || (user && hasMinRole(user.role, item.minRole))
-  );
+  const visibleItems = NAV_ITEMS;
 
   return (
     <>
